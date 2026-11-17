@@ -8,6 +8,7 @@
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
 <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <style>
 :root{
   --bg:#F5F4F1; --card:#FFFFFF; --ink:#23221F; --muted:#6F6B64; --faint:#9A958D;
@@ -68,7 +69,7 @@ h3{font-size:1.06rem;margin:0}
 .btn.ghost:hover{background:var(--soft);color:var(--ink)}
 .btn.sm{padding:6px 11px;font-size:.86rem;border-radius:8px}
 .btn.danger{color:#9B3B2E}
-input[type=text],input[type=number],input[type=date],input[type=search],select,textarea{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:10px 12px;outline:none;min-width:0}
+input[type=text],input[type=password],input[type=number],input[type=date],input[type=search],select,textarea{border:1px solid var(--line);background:var(--card);border-radius:10px;padding:10px 12px;outline:none;min-width:0}
 input:focus,select:focus,textarea:focus{border-color:var(--accent-line);box-shadow:0 0 0 3px var(--accent-soft)}
 textarea{width:100%;resize:vertical;min-height:90px}
 label.f{display:block;font-size:.84rem;font-weight:600;color:var(--muted);margin-bottom:6px}
@@ -199,9 +200,48 @@ table.sheet tr.pulse td{animation:pulse 1.8s ease-out}
 hr.sep{border:0;border-top:1px solid var(--line);margin:18px 0}
 .tests li{margin:6px 0}
 .tests{padding-left:20px;margin:8px 0 0;color:#4B4842;font-size:.92rem}
+/* auth */
+body.signed-out header.top,body.signed-out main{display:none}
+#auth{display:none;min-height:100vh;place-items:center;padding:24px}
+body.signed-out #auth{display:grid}
+#auth .card{width:min(420px,100%);padding:34px 32px}
+#auth .brand{margin-bottom:26px}
+#auth .field{margin-bottom:16px}
+.err{color:#9B3B2E;font-size:.9rem;min-height:1.4em;margin:4px 0 10px}
+.userbox{display:flex;align-items:center;gap:10px;margin-left:18px;padding-left:18px;border-left:1px solid var(--line)}
+.avatar{width:36px;height:36px;border-radius:50%;background:var(--soft);display:grid;place-items:center;font-weight:700;color:var(--accent-ink);flex:none}
+.userbox .who{font-size:.86rem;line-height:1.25}
+.userbox .who b{display:block}
+.sync{font-size:.78rem;color:var(--faint)}
+.sync.err{color:#9B3B2E;margin:0;min-height:0}
+.menu{position:relative}
+.menu .pop{position:absolute;right:0;top:calc(100% + 8px);background:var(--card);border:1px solid var(--line);border-radius:12px;box-shadow:0 10px 30px rgba(0,0,0,.08);padding:6px;min-width:200px;display:none;z-index:30}
+.menu.on .pop{display:block}
+.menu .pop button{display:block;width:100%;text-align:left;border:0;background:none;padding:10px 12px;border-radius:8px}
+.menu .pop button:hover{background:var(--soft2)}
+table.users{width:100%;border-collapse:collapse;font-size:.95rem}
+table.users th{text-align:left;color:var(--muted);font-weight:600;font-size:.82rem;padding:10px 12px;border-bottom:1px solid var(--line)}
+table.users td{padding:12px;border-bottom:1px solid var(--soft);vertical-align:middle}
+table.users select{padding:6px 10px;font-size:.88rem}
+.banner{background:var(--accent-soft);border:1px solid var(--accent-line);color:var(--accent-ink);border-radius:12px;padding:12px 16px;margin-bottom:18px;display:flex;align-items:center;gap:12px;flex-wrap:wrap}
+@media(max-width:760px){.userbox .who{display:none}.eng{display:none}}
 </style>
 </head>
-<body>
+<body class="signed-out">
+<div id="auth">
+  <form class="card" id="loginForm" autocomplete="on">
+    <div class="brand">
+      <div class="dot"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3 8-8"/><path d="M20 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg></div>
+      <div>Audit Tracker<small>SFRS(I) · SSA testing workspace</small></div>
+    </div>
+    <h1 style="font-size:1.4rem">Sign in</h1>
+    <p class="sub" style="margin-bottom:20px">Use the username and password your administrator gave you.</p>
+    <div class="field"><label class="f" for="lUser">Username</label><input type="text" id="lUser" autocomplete="username" autocapitalize="none" spellcheck="false" required></div>
+    <div class="field"><label class="f" for="lPass">Password</label><input type="password" id="lPass" autocomplete="current-password" required></div>
+    <div class="err" id="lErr"></div>
+    <button class="btn primary" style="width:100%;justify-content:center;padding:12px" id="lBtn" type="submit">Sign in</button>
+  </form>
+</div>
 <header class="top">
   <div class="wrap">
     <div class="topbar">
@@ -210,6 +250,12 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:18px 0}
         <div>Audit Tracker<small>SFRS(I) · SSA testing workspace</small></div>
       </div>
       <div class="eng" id="engLine"></div>
+      <div class="userbox">
+        <div class="menu" id="userMenu">
+          <button class="linkish row" id="userBtn" style="gap:10px"><span class="avatar" id="uAvatar"></span><span class="who"><b id="uName"></b><span class="sync" id="syncState">Saved</span></span></button>
+          <div class="pop"><button id="btnChangePw">Change password</button><button id="btnSignOut">Sign out</button></div>
+        </div>
+      </div>
     </div>
     <nav class="tabs" id="tabs">
       <button data-tab="overview">Overview</button>
@@ -217,6 +263,7 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:18px 0}
       <button data-tab="workpapers">Workpapers <span class="count" id="cFiles">0</span></button>
       <button data-tab="standards">Standards</button>
       <button data-tab="engagement">Engagement setup</button>
+      <button data-tab="users" id="tabUsers" hidden>Users</button>
     </nav>
   </div>
 </header>
@@ -301,6 +348,27 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:18px 0}
     <div class="grid g2" id="stdList" style="grid-template-columns:1fr 1fr"></div>
   </section>
 
+  <!-- USERS (admin) -->
+  <section class="view" id="v-users">
+    <h1>Users</h1>
+    <p class="sub">Create sign-ins for your team and set their initial password. Users are asked to change it after they first sign in.</p>
+    <div class="grid g2" style="grid-template-columns:1fr 1.6fr">
+      <form class="card" id="addUserForm">
+        <h2>Add user</h2>
+        <div class="field"><label class="f">Username</label><input type="text" id="nuUser" placeholder="e.g. priya" autocapitalize="none" spellcheck="false" required></div>
+        <div class="field mt"><label class="f">Full name</label><input type="text" id="nuName" placeholder="e.g. Priya Raman"></div>
+        <div class="field mt"><label class="f">Role</label><select id="nuRole"><option value="auditor">Auditor</option><option value="admin">Administrator</option></select></div>
+        <div class="field mt"><label class="f">Initial password</label><input type="text" id="nuPass" placeholder="At least 6 characters" required autocomplete="off"></div>
+        <div class="err" id="nuErr"></div>
+        <button class="btn primary" type="submit" id="nuBtn">Create user</button>
+      </form>
+      <div class="card">
+        <div class="row"><h2 style="margin:0">Team</h2><span class="spacer"></span><button class="btn sm ghost" id="btnReloadUsers">Refresh</button></div>
+        <div id="userList" class="mt"></div>
+      </div>
+    </div>
+  </section>
+
   <!-- ENGAGEMENT -->
   <section class="view" id="v-engagement">
     <h1>Engagement setup</h1>
@@ -325,7 +393,7 @@ hr.sep{border:0;border-top:1px solid var(--line);margin:18px 0}
       </div>
       <div class="card">
         <h2>Data</h2>
-        <p class="muted">Everything is stored in this browser's local storage. Nothing is uploaded to a server.</p>
+        <p class="muted">Your workbooks, issues and settings are saved to your account in Supabase, so they follow you to any device you sign in on. Other users cannot see them.</p>
         <dl class="kv" id="dataKv"></dl>
         <div class="row mt2">
           <button class="btn" id="btnRerunAll">Re-run all tests</button>
@@ -450,27 +518,63 @@ const LEVELS = ['High','Medium','Low'];
 /* ============================================================
    State & storage
    ============================================================ */
-const KEY='auditTracker.v1';
+const KEY='auditTracker.v1'; // legacy local-only storage (migrated on first sign-in)
+const SB_URL='https://qjlzyqadysgcslfjgrff.supabase.co';
+const SB_KEY='sb_publishable_StGF1hIxA5VSad17cHSVDg_3j9vGHn3';
+const EMAIL_DOMAIN='audit-tracker.local';
 const MAXROWS=5000, PAGE=200, CAP=25;
 const $=s=>document.querySelector(s);
 const $$=s=>[...document.querySelectorAll(s)];
 const esc=s=>String(s??'').replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
-const uid=()=>Math.random().toString(36).slice(2,10);
+const uid=()=>(window.crypto&&crypto.randomUUID)?crypto.randomUUID():Math.random().toString(36).slice(2,12)+Date.now().toString(36);
 function defaults(){return {settings:{entity:'',fye:'2025-12-31',currency:'S$',materiality:500000,pmPct:75,trivialPct:5,roundThreshold:10000,cutoffDays:14},files:[],issues:[],ui:{fileId:null,sheet:null,page:0,selRow:null}}}
-function load(){
-  try{const r=localStorage.getItem(KEY); if(r){const o=JSON.parse(r), d=defaults(); return {...d,...o,settings:{...d.settings,...(o.settings||{})},ui:{...d.ui,...(o.ui||{})}};}}catch(e){}
-  return defaults();
+let S=defaults(), ME=null, sb=null;
+try{sb=window.supabase.createClient(SB_URL,SB_KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:false}});}catch(e){console.error(e);}
+
+/* ---------- Supabase persistence ---------- */
+const synced={settings:null,files:new Map(),issues:new Map()};
+let syncTimer=null,syncing=false,syncAgain=false;
+function setSync(state,msg){const el=$('#syncState');if(!el)return;el.classList.toggle('err',state==='error');el.textContent=state==='saving'?'Saving…':state==='pending'?'Unsaved changes':state==='error'?'Not saved — retrying':'All changes saved';el.title=msg||'';}
+function save(){try{if(ME)localStorage.setItem('auditTracker.ui.'+ME.id,JSON.stringify(S.ui));}catch(e){}scheduleSync();}
+function scheduleSync(){if(!ME||!sb)return;setSync('pending');clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,700);}
+const settingsRow=()=>{const s=S.settings;return {entity:s.entity||'',fye:s.fye||null,currency:s.currency||'',materiality:+s.materiality||0,pm_pct:+s.pmPct||75,trivial_pct:+s.trivialPct||0,round_threshold:+s.roundThreshold||0,cutoff_days:+s.cutoffDays||0};};
+const fileSig=f=>JSON.stringify({n:f.name,t:f.tested||null,s:f.sheets.map(x=>[x.name,x.header,x.map,x.rows.length])});
+const fileRow=(f,u)=>({user_id:u,id:f.id,name:f.name,size:f.size||0,is_sample:!!f.sample,sheets:f.sheets,uploaded_at:f.uploaded||null,tested_at:f.tested||null,updated_at:new Date().toISOString()});
+const issueRow=(i,u)=>({user_id:u,id:i.id,workbook_id:(i.loc&&i.loc.fileId)||null,auto:!!i.auto,test:i.test||null,title:i.title,detail:i.detail||null,amount:+i.amount||0,category:i.category||null,level:i.level,priority:i.priority,pri_manual:!!i.priManual,level_manual:!!i.levelManual,pri_floor:i.priFloor||null,status:i.status||'Open',refs:i.refs||[],loc:i.loc||null,notes:i.notes||null,created_at:i.created||null});
+const issueFrom=r=>({id:r.id,auto:r.auto,test:r.test||undefined,title:r.title,detail:r.detail||'',amount:+r.amount||0,category:r.category,level:r.level,priority:r.priority,priManual:!!r.pri_manual,levelManual:!!r.level_manual,priFloor:r.pri_floor||undefined,status:r.status,refs:r.refs||[],loc:r.loc||{},notes:r.notes||'',created:r.created_at});
+const fileFrom=r=>({id:r.id,name:r.name,size:+r.size||0,sample:r.is_sample,sheets:r.sheets||[],uploaded:r.uploaded_at,tested:r.tested_at});
+async function syncNow(){
+  if(!ME)return; if(syncing){syncAgain=true;return;}
+  syncing=true;setSync('saving');const u=ME.id;
+  try{
+    const st=settingsRow(),sj=JSON.stringify(st);
+    if(sj!==synced.settings){const {error}=await sb.from('settings').upsert({user_id:u,...st,updated_at:new Date().toISOString()},{onConflict:'user_id'});if(error)throw error;synced.settings=sj;}
+    const curF=new Set(S.files.map(f=>f.id));
+    for(const f of S.files){const sig=fileSig(f);if(synced.files.get(f.id)!==sig){const {error}=await sb.from('workbooks').upsert(fileRow(f,u),{onConflict:'user_id,id'});if(error)throw error;synced.files.set(f.id,sig);}}
+    const goneF=[...synced.files.keys()].filter(id=>!curF.has(id));
+    if(goneF.length){const {error}=await sb.from('workbooks').delete().eq('user_id',u).in('id',goneF);if(error)throw error;goneF.forEach(id=>synced.files.delete(id));}
+    const cur=new Set(),dirty=[];
+    S.issues.forEach(i=>{cur.add(i.id);const r=issueRow(i,u),sig=JSON.stringify(r);if(synced.issues.get(i.id)!==sig)dirty.push([r,sig]);});
+    for(let k=0;k<dirty.length;k+=400){const ch=dirty.slice(k,k+400);const {error}=await sb.from('issues').upsert(ch.map(x=>({...x[0],updated_at:new Date().toISOString()})),{onConflict:'user_id,id'});if(error)throw error;ch.forEach(([r,sig])=>synced.issues.set(r.id,sig));}
+    const goneI=[...synced.issues.keys()].filter(id=>!cur.has(id));
+    for(let k=0;k<goneI.length;k+=200){const ch=goneI.slice(k,k+200);const {error}=await sb.from('issues').delete().eq('user_id',u).in('id',ch);if(error)throw error;ch.forEach(id=>synced.issues.delete(id));}
+    setSync('saved');
+  }catch(e){console.error(e);setSync('error',e.message||String(e));clearTimeout(syncTimer);syncTimer=setTimeout(syncNow,8000);}
+  finally{syncing=false;if(syncAgain){syncAgain=false;scheduleSync();}}
 }
-let S=load(), storeWarned=false;
-function save(){
-  try{localStorage.setItem(KEY,JSON.stringify(S));}
-  catch(e){
-    try{
-      const lite={...S,files:S.files.map(f=>({...f,sheets:f.sheets.map(s=>({...s,rows:[],dropped:true}))}))};
-      localStorage.setItem(KEY,JSON.stringify(lite));
-      if(!storeWarned){toast('Storage is full: issues are saved, but workbook contents will not survive a reload.');storeWarned=true;}
-    }catch(e2){ if(!storeWarned){toast('Browser storage is unavailable — data will not persist.');storeWarned=true;} }
-  }
+async function loadCloud(){
+  const u=ME.id;
+  const [st,wb]=await Promise.all([sb.from('settings').select('*').eq('user_id',u).maybeSingle(),sb.from('workbooks').select('*').eq('user_id',u)]);
+  if(st.error)throw st.error;if(wb.error)throw wb.error;
+  const iss=[];for(let from=0;;from+=1000){const {data,error}=await sb.from('issues').select('*').eq('user_id',u).order('created_at').range(from,from+999);if(error)throw error;iss.push(...data);if(data.length<1000)break;}
+  S=defaults();
+  if(st.data){const r=st.data;Object.assign(S.settings,{entity:r.entity||'',fye:r.fye||'',currency:r.currency??'S$',materiality:+r.materiality,pmPct:+r.pm_pct,trivialPct:+r.trivial_pct,roundThreshold:+r.round_threshold,cutoffDays:+r.cutoff_days});}
+  S.files=(wb.data||[]).map(fileFrom);S.issues=iss.map(issueFrom);
+  synced.settings=st.data?JSON.stringify(settingsRow()):null;
+  synced.files=new Map(S.files.map(f=>[f.id,fileSig(f)]));
+  synced.issues=new Map(S.issues.map(i=>[i.id,JSON.stringify(issueRow(i,u))]));
+  try{const ui=JSON.parse(localStorage.getItem('auditTracker.ui.'+u)||'null');if(ui)S.ui={...S.ui,...ui};}catch(e){}
+  setSync('saved');
 }
 function M(){const s=S.settings,m=+s.materiality||0;return {m,pm:m*(+s.pmPct||75)/100,triv:m*(+s.trivialPct||0)/100};}
 function fmt(n){if(n==null||isNaN(n))return '—';const a=Math.abs(n).toLocaleString('en-SG',{minimumFractionDigits:2,maximumFractionDigits:2});return (S.settings.currency?S.settings.currency+' ':'')+(n<0?'('+a+')':a);}
@@ -793,6 +897,7 @@ function renderHeader(){
   const st=S.settings,open=S.issues.filter(i=>i.status!=='Resolved').length;
   $('#engLine').innerHTML=`<b>${esc(st.entity||'Untitled engagement')}</b><br>FYE ${esc(st.fye||'—')} · Materiality ${fmtShort(+st.materiality||0)}`;
   $('#cIssues').textContent=open;$('#cFiles').textContent=S.files.length;
+  if(ME){$('#uName').textContent=ME.full_name||ME.username;$('#uAvatar').textContent=(ME.full_name||ME.username||'?').trim()[0].toUpperCase();$('#tabUsers').hidden=ME.role!=='admin';}
 }
 
 function renderOverview(){
@@ -870,8 +975,7 @@ function renderStandards(){
 
 function renderEngagement(){
   const s=S.settings;$('#sEntity').value=s.entity;$('#sFye').value=s.fye;$('#sCur').value=s.currency;$('#sCut').value=s.cutoffDays;$('#sMat').value=s.materiality;$('#sPm').value=s.pmPct;$('#sTriv').value=s.trivialPct;$('#sRound').value=s.roundThreshold;
-  let bytes=0;try{bytes=(localStorage.getItem(KEY)||'').length;}catch(e){}
-  $('#dataKv').innerHTML=`<dt>Workbooks</dt><dd>${S.files.length}</dd><dt>Issues</dt><dd>${S.issues.length}</dd><dt>Storage used</dt><dd>${(bytes/1024).toFixed(0)} KB</dd>`;
+  $('#dataKv').innerHTML=`<dt>Signed in as</dt><dd>${esc(ME?ME.username:'')}</dd><dt>Role</dt><dd>${ME&&ME.role==='admin'?'Administrator':'Auditor'}</dd><dt>Workbooks</dt><dd>${S.files.length}</dd><dt>Issues</dt><dd>${S.issues.length}</dd>`;
 }
 
 let TAB='overview';
@@ -879,7 +983,10 @@ function render(){
   renderHeader();
   $$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===TAB));
   $$('section.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+TAB));
-  ({overview:renderOverview,issues:renderIssues,workpapers:renderWorkpapers,standards:renderStandards,engagement:renderEngagement})[TAB]();
+  if(TAB==='users'&&!(ME&&ME.role==='admin')){TAB='overview';return render();}
+  $$('#tabs button').forEach(b=>b.classList.toggle('on',b.dataset.tab===TAB));
+  $$('section.view').forEach(v=>v.classList.toggle('on',v.id==='v-'+TAB));
+  ({overview:renderOverview,issues:renderIssues,workpapers:renderWorkpapers,standards:renderStandards,engagement:renderEngagement,users:renderUsers})[TAB]();
 }
 function setTab(t){TAB=t;if(location.hash.slice(1)!==t){try{history.replaceState(null,'','#'+t);}catch(e){location.hash=t;}}render();window.scrollTo({top:0});}
 
@@ -1083,7 +1190,7 @@ $('#btnSample').onclick=()=>{const f=sampleFile();S.files=S.files.filter(x=>x.id
 $('#btnSaveSet').onclick=()=>{const s=S.settings;s.entity=$('#sEntity').value.trim();s.fye=$('#sFye').value;s.currency=$('#sCur').value.trim();s.cutoffDays=+$('#sCut').value||0;s.materiality=+$('#sMat').value||0;s.pmPct=+$('#sPm').value||75;s.trivialPct=+$('#sTriv').value||0;s.roundThreshold=+$('#sRound').value||0;
   S.files.forEach(f=>runTests(f,true));S.issues.forEach(i=>{if(!i.priManual)i.priority=priority(i);});save();render();toast('Settings saved — tests re-run');};
 $('#btnRerunAll').onclick=()=>{S.files.forEach(f=>runTests(f,true));save();render();toast('All tests re-run');};
-$('#btnReset').onclick=()=>confirmBox('Clear all data?','This removes every workbook, issue and setting stored in this browser.',()=>{S=defaults();try{localStorage.removeItem(KEY);}catch(e){}render();toast('All data cleared');});
+$('#btnReset').onclick=()=>confirmBox('Clear all data?','This permanently removes every workbook, issue and setting saved to your account.',()=>{const ui=S.ui;S=defaults();S.ui=ui;save();render();toast('All data cleared');});
 $('#btnCopyCsv').onclick=async()=>{
   const q=v=>'"'+String(v??'').replace(/"/g,'""')+'"';
   const lines=[['Rank','Priority','Risk level','Category','Status','Title','Amount','Location','References','Detail','Notes'].map(q).join(',')].concat(ranked().map(i=>[i._rank||'',i.priority,i.level,i.category,i.status,i.title,i.amount||0,locText(i.loc),(i.refs||[]).map(refLabel).join('; '),i.detail,i.notes].map(q).join(',')));
@@ -1093,7 +1200,120 @@ $('#btnCopyCsv').onclick=async()=>{
 };
 
 /* init */
-(function(){const h=location.hash.slice(1);if(h&&document.getElementById('v-'+h))TAB=h;render();})();
+/* ============================================================
+   Authentication & user management
+   ============================================================ */
+const toEmail=u=>{u=u.trim().toLowerCase();return u.includes('@')?u:`${u}@${EMAIL_DOMAIN}`;};
+function showAuth(msg){document.body.classList.add('signed-out');closeModal();closeDrawer();$('#lErr').textContent=msg||'';$('#lPass').value='';setTimeout(()=>$('#lUser').focus(),30);}
+async function afterSignIn(user){
+  const {data:prof,error}=await sb.from('profiles').select('*').eq('id',user.id).single();
+  if(error||!prof){await sb.auth.signOut();showAuth('Your account has no profile — ask an administrator.');return;}
+  ME=prof;
+  try{await loadCloud();}catch(e){console.error(e);ME=null;await sb.auth.signOut();showAuth('Could not load your data: '+(e.message||e));return;}
+  document.body.classList.remove('signed-out');
+  const h=location.hash.slice(1);TAB=(h&&document.getElementById('v-'+h))?h:'overview';
+  render();
+  if(ME.must_change_password)changePassword(true);else checkLegacy();
+}
+$('#loginForm').addEventListener('submit',async e=>{
+  e.preventDefault();if(!sb){$('#lErr').textContent='Sign-in is unavailable — the Supabase library did not load.';return;}
+  const u=$('#lUser').value,p=$('#lPass').value;if(!u||!p)return;
+  $('#lBtn').disabled=true;$('#lBtn').textContent='Signing in…';$('#lErr').textContent='';
+  const {data,error}=await sb.auth.signInWithPassword({email:toEmail(u),password:p});
+  $('#lBtn').disabled=false;$('#lBtn').textContent='Sign in';
+  if(error){$('#lErr').textContent=/invalid/i.test(error.message)?'Incorrect username or password.':error.message;return;}
+  await afterSignIn(data.user);
+});
+async function signOut(){
+  $('#userMenu').classList.remove('on');
+  if(ME){clearTimeout(syncTimer);await syncNow();}
+  ME=null;S=defaults();synced.files.clear();synced.issues.clear();synced.settings=null;
+  await sb.auth.signOut();showAuth();toast('Signed out');
+}
+$('#btnSignOut').onclick=signOut;
+$('#userBtn').onclick=e=>{e.stopPropagation();$('#userMenu').classList.toggle('on');};
+document.addEventListener('click',e=>{if(!e.target.closest('#userMenu'))$('#userMenu').classList.remove('on');});
+$('#btnChangePw').onclick=()=>{$('#userMenu').classList.remove('on');changePassword(false);};
+function changePassword(forced){
+  $('#mTitle').textContent=forced?'Set your own password':'Change password';
+  $('#mBody').innerHTML=`${forced?'<div class="banner" style="margin:0">You signed in with an initial password set by an administrator. Please choose your own.</div>':''}
+    <div class="field"><label class="f">New password</label><input type="password" id="pw1" autocomplete="new-password"></div>
+    <div class="field"><label class="f">Confirm new password</label><input type="password" id="pw2" autocomplete="new-password"></div><div class="err" id="pwErr" style="margin:0"></div>`;
+  $('#mFoot').style.justifyContent='flex-end';
+  $('#mFoot').innerHTML=`<button class="btn" data-close>${forced?'Later':'Cancel'}</button><button class="btn primary" id="pwSave">Update password</button>`;
+  $('#pwSave').onclick=async()=>{
+    const a=$('#pw1').value,b=$('#pw2').value;
+    if(a.length<8){$('#pwErr').textContent='Use at least 8 characters.';return;}
+    if(a!==b){$('#pwErr').textContent='The passwords do not match.';return;}
+    if(a==='password'){$('#pwErr').textContent='Choose something other than the default password.';return;}
+    $('#pwSave').disabled=true;
+    const {error}=await sb.auth.updateUser({password:a});
+    if(error){$('#pwSave').disabled=false;$('#pwErr').textContent=error.message;return;}
+    await sb.rpc('mark_password_changed');ME.must_change_password=false;
+    closeModal();toast('Password updated');if(forced)checkLegacy();
+  };
+  openModal();setTimeout(()=>$('#pw1').focus(),30);
+}
+function checkLegacy(){
+  let old=null;try{old=JSON.parse(localStorage.getItem(KEY)||'null');}catch(e){}
+  if(!old||!((old.files&&old.files.length)||(old.issues&&old.issues.length)))return;
+  if(S.files.length||S.issues.length)return;
+  confirmBox('Import data saved in this browser?',`This browser has ${old.files?old.files.length:0} workbook(s) and ${old.issues?old.issues.length:0} issue(s) from before sign-in was added. Import them into your account? They will then be removed from this browser.`,()=>{
+    S.files=(old.files||[]);S.issues=(old.issues||[]);S.settings={...S.settings,...(old.settings||{})};
+    save();render();try{localStorage.removeItem(KEY);}catch(e){}toast('Imported — saving to your account');
+  });
+}
+async function invokeAdmin(body){
+  const {data,error}=await sb.functions.invoke('admin-users',{body});
+  if(error){let msg=error.message;try{const j=await error.context.json();if(j&&j.error)msg=j.error;}catch(e){}throw new Error(msg);}
+  if(data&&data.error)throw new Error(data.error);
+  return data;
+}
+let USERS=null;
+async function loadUsers(){const {data,error}=await sb.from('profiles').select('*').order('username');if(error){toast(error.message);return;}USERS=data;renderUsers();}
+function renderUsers(){
+  if(!ME||ME.role!=='admin')return;
+  if(!USERS){$('#userList').innerHTML='<p class="muted">Loading…</p>';loadUsers();return;}
+  $('#userList').innerHTML=`<table class="users"><thead><tr><th>User</th><th>Role</th><th>Password</th><th></th></tr></thead><tbody>${USERS.map(u=>`<tr><td><b>${esc(u.full_name||u.username)}</b><div class="small muted">${esc(u.username)}${u.id===ME.id?' · you':''}</div></td>
+    <td><select data-urole="${u.id}" ${u.id===ME.id?'disabled':''}><option value="auditor" ${u.role==='auditor'?'selected':''}>Auditor</option><option value="admin" ${u.role==='admin'?'selected':''}>Administrator</option></select></td>
+    <td class="small">${u.must_change_password?'<span class="badge lvl-High">Initial password</span>':'<span class="muted">Changed by user</span>'}</td>
+    <td style="text-align:right;white-space:nowrap"><button class="btn sm" data-ureset="${u.id}">Reset password</button> ${u.id===ME.id?'':`<button class="btn sm ghost danger" data-udel="${u.id}">Delete</button>`}</td></tr>`).join('')}</tbody></table>`;
+}
+$('#btnReloadUsers').onclick=()=>{USERS=null;renderUsers();};
+$('#addUserForm').addEventListener('submit',async e=>{
+  e.preventDefault();const b=$('#nuBtn');$('#nuErr').textContent='';
+  const username=$('#nuUser').value.trim().toLowerCase(),password=$('#nuPass').value;
+  if(!/^[a-z0-9._-]{2,40}$/.test(username)){$('#nuErr').textContent='Username: 2–40 characters — letters, numbers, dot, dash or underscore.';return;}
+  if(password.length<6){$('#nuErr').textContent='Initial password must be at least 6 characters.';return;}
+  b.disabled=true;b.textContent='Creating…';
+  try{await invokeAdmin({action:'create',username,password,full_name:$('#nuName').value.trim()||username,role:$('#nuRole').value});
+    toast(`User "${username}" created`);e.target.reset();USERS=null;renderUsers();}
+  catch(err){$('#nuErr').textContent=err.message;}
+  b.disabled=false;b.textContent='Create user';
+});
+document.addEventListener('change',async e=>{const t=e.target;if(!t.dataset.urole)return;
+  try{await invokeAdmin({action:'set_role',user_id:t.dataset.urole,role:t.value});toast('Role updated');}catch(err){toast(err.message);}USERS=null;renderUsers();});
+document.addEventListener('click',e=>{
+  const r=e.target.closest('[data-ureset]'),d=e.target.closest('[data-udel]');
+  if(r){const u=USERS.find(x=>x.id===r.dataset.ureset);
+    $('#mTitle').textContent='Reset password — '+(u.full_name||u.username);
+    $('#mBody').innerHTML='<p class="muted" style="margin:0">Set a new initial password. The user will be asked to change it at their next sign-in.</p><div class="field"><label class="f">New initial password</label><input type="text" id="rpw" autocomplete="off"></div><div class="err" id="rpErr" style="margin:0"></div>';
+    $('#mFoot').style.justifyContent='flex-end';$('#mFoot').innerHTML='<button class="btn" data-close>Cancel</button><button class="btn primary" id="rpSave">Reset password</button>';
+    $('#rpSave').onclick=async()=>{const p=$('#rpw').value;if(p.length<6){$('#rpErr').textContent='At least 6 characters.';return;}
+      try{await invokeAdmin({action:'reset_password',user_id:u.id,password:p});closeModal();toast('Password reset');USERS=null;renderUsers();}catch(err){$('#rpErr').textContent=err.message;}};
+    openModal();setTimeout(()=>$('#rpw').focus(),30);}
+  if(d){const u=USERS.find(x=>x.id===d.dataset.udel);
+    confirmBox(`Delete ${u.full_name||u.username}?`,'This removes their sign-in and all of their workbooks and issues. It cannot be undone.',async()=>{
+      try{await invokeAdmin({action:'delete',user_id:u.id});toast('User deleted');}catch(err){toast(err.message);}USERS=null;renderUsers();});}
+});
+
+/* init */
+(async function boot(){
+  if(!sb){showAuth('Sign-in is unavailable — the Supabase library could not load. Check your connection and reload.');return;}
+  sb.auth.onAuthStateChange((ev)=>{if(ev==='SIGNED_OUT'&&ME){ME=null;S=defaults();showAuth('Your session ended — please sign in again.');}});
+  const {data:{session}}=await sb.auth.getSession();
+  if(session&&session.user)await afterSignIn(session.user);else showAuth();
+})();
 </script>
 </body>
 </html>

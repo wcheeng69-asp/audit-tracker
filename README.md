@@ -11,9 +11,31 @@ A single-page audit testing workspace for financial documents. Upload Excel work
 
 Automated tests: debit/credit balance, casting of totals, duplicates, round-sum and weekend entries, manual/suspense entries, items above performance materiality, period-end cut-off, credit balances on assets, aged receivables (>365 days), related-party indicators, formula errors, numbers stored as text and blank descriptions.
 
-## Data & privacy
+## Sign-in & user management
 
-All data is stored in the browser's `localStorage`. Workbooks are parsed client-side with [SheetJS](https://sheetjs.com/) (loaded from cdnjs) and are never sent to a server. Data is per browser and per device — clearing site data removes it.
+Authentication uses Supabase Auth (`auth.users`). Users sign in with a **username**; the app maps it to an internal email `username@audit-tracker.local`.
+
+| Username | Role | Initial password |
+|---|---|---|
+| priya | Administrator | `password` |
+| dan | Auditor | `password` |
+| marcus | Auditor | `password` |
+
+Users are prompted to choose their own password after first sign-in. Administrators get a **Users** tab to add users with an initial password, reset passwords, change roles and delete users. These actions go through the `admin-users` Edge Function, which checks the caller is an admin and uses the service-role key server-side — no secret keys are in the browser.
+
+## Data
+
+Workbooks, issues and engagement settings are stored in Supabase per user (`public.settings`, `public.workbooks`, `public.issues`) with row-level security — each user sees only their own data. Data saved in a browser before sign-in was added is offered for import on first sign-in. Workbooks are parsed client-side with [SheetJS](https://sheetjs.com/).
+
+### Supabase files
+
+- `supabase/migrations/…_audit_tracker_schema.sql` — tables, RLS policies, profile trigger
+- `supabase/seed_users.sql` — the three seed users (already applied)
+- `supabase/functions/admin-users/` — admin Edge Function (deployed, `verify_jwt = false`; it validates the caller itself)
+
+The publishable key in `index.html` is safe to expose; access is enforced by RLS.
+
+**Recommended:** in the Supabase dashboard → Authentication → Sign In / Providers, turn off **Allow new users to sign up**, so accounts can only be created by an administrator.
 
 ## Deploy to Vercel
 
